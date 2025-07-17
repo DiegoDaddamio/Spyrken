@@ -11,7 +11,7 @@ __version__ = "0.1.0"
 # Vous pouvez également ajouter une description du package
 __description__ = "Simulateur de circuits électriques pour l'analyse et la visualisation de circuits."
 
-# Facultatif : Ajouter des informations supplémentaires
+# Facultatif : 
 # __author__ = "DiegoDaddamio"
 # __email__ = "diego.daddamio3110@gmail.com"
 # __url__ = ""
