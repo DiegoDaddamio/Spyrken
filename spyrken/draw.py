@@ -433,8 +433,9 @@ def voltage_phasors2(self, duration=10, fps=60, theme='light'):
     
     plt.show()
 
-def plot_bode2(self,from_node,to_node,freq_range,show_phase=True):
-    """ Génère un diagramme de Bode """
+def plot_bode(self,from_node,to_node,freq_range,show_phase=True):
+    """ Génère un diagramme de Bode 
+    Utilisation : Tel une sonde oscilloscope, il faut partir d'une référence (from, souvent GND) vers une comparaison (to)"""
     gains = []
     phases = []
     frequencies = freq_range
@@ -443,13 +444,16 @@ def plot_bode2(self,from_node,to_node,freq_range,show_phase=True):
 
     for freq in tqdm(frequencies) :
         self.freq = freq
+        for source in sources:
+            source.freq = freq
+        
         self.solve()
 
         Vfn = from_node.voltage
         Vtn = to_node.voltage
 
-        V = abs(Vtn - Vfn)
-        v_ref = abs(sources[0].source_voltage)
+        V = Vtn - Vfn
+        v_ref = sources[0].source_voltage
 
         # Gain
         if abs(v_ref) < 1e-12:
@@ -459,13 +463,12 @@ def plot_bode2(self,from_node,to_node,freq_range,show_phase=True):
             gain_db = 20 * np.log10(gain) if gain > 0 else -100
         
         # Phase
-        if abs(v_ref) < 1e-12 or abs(V) < 1e-12:
-            phase = 0
-        else:
-            v1 = V if isinstance(V, complex) else complex(V, 0)
-            v2 = v_ref if isinstance(v_ref, complex) else complex(v_ref, 0)
-            phase = np.angle(v1 / v2, deg=True)
-            phase = ((phase + 180) % 360) - 180
+
+        v1 = V if isinstance(V, complex) else complex(V, 0)
+        v2 = v_ref if isinstance(v_ref, complex) else complex(v_ref, 0)
+        phase = np.angle(v1/v2, deg=True)
+
+        
         
         # Stocker les résultats
         gains.append(gain_db)
@@ -490,7 +493,7 @@ def plot_bode2(self,from_node,to_node,freq_range,show_phase=True):
         ax2.semilogx(frequencies, phases, 'r-', linewidth=2)
         ax2.set_xlabel('Fréquence (Hz)')
         ax2.set_ylabel('Phase (degrés)')
-        ax2.set_ylim(-180, 180)
+        ax2.set_ylim(min(phases)-5, max(phases)+5)
         ax2.grid(True, which="both", ls="--", alpha=0.3)
     else:
         ax1.set_xlabel('Fréquence (Hz)')
@@ -500,7 +503,7 @@ def plot_bode2(self,from_node,to_node,freq_range,show_phase=True):
     
     return frequencies, phases, gains
 
-def plot_bode(self, from_node=None, to_node=None, component=None, 
+def plot_bode2(self, from_node=None, to_node=None, component=None, 
             freq_range=None, num_points=200, show_phase=True):
     """
     Génère un diagramme de Bode simple pour analyser la réponse en fréquence.
@@ -602,10 +605,8 @@ def plot_bode(self, from_node=None, to_node=None, component=None,
     phases = []
     
     # Calcul pour chaque fréquence
-    print("Calcul en cours...")
-    for i, freq in enumerate(frequencies):
-        if i % 20 == 0:
-            print(f"Progression: {i/num_points*100:.0f}%")
+
+    for freq in tqdm(frequencies):
             
         # Configurer la fréquence
         self.freq = freq
@@ -649,8 +650,6 @@ def plot_bode(self, from_node=None, to_node=None, component=None,
         source.freq = freq
     self.solve()
     
-    print("Calcul terminé")
-    
     # Créer les graphiques
     if show_phase:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
@@ -669,7 +668,7 @@ def plot_bode(self, from_node=None, to_node=None, component=None,
         ax2.semilogx(frequencies, phases, 'r-', linewidth=2)
         ax2.set_xlabel('Fréquence (Hz)')
         ax2.set_ylabel('Phase (degrés)')
-        ax2.set_ylim(-180, 180)
+        ax2.set_ylim(min(phases)-5, max(phases)+5)
         ax2.grid(True, which="both", ls="--", alpha=0.3)
     else:
         ax1.set_xlabel('Fréquence (Hz)')
@@ -677,4 +676,23 @@ def plot_bode(self, from_node=None, to_node=None, component=None,
     plt.tight_layout()
     plt.show()
     
-    return frequencies, phases, gains
+    return {
+        'frequencies': frequencies,
+        'gains': gains,
+        'phases': phases
+    }
+
+def probe(self,from_node,to_node):
+
+    sources = [c for c in self.components if isinstance(c, VoltageSource)]
+
+    if not(self._solved) :
+        self.solve()
+    
+    Vfn = from_node.voltage
+    Vtn = to_node.voltage
+
+    V = Vtn - Vfn
+    v_ref = sources[0].source_voltage
+
+    # On work
