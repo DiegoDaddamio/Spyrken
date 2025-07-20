@@ -682,17 +682,116 @@ def plot_bode2(self, from_node=None, to_node=None, component=None,
         'phases': phases
     }
 
-def probe(self,from_node,to_node):
-
+def scope(self, from_node, to_node, time_span=0.1, num_points=1000, show_ref=True, title=None):
+    """
+    Affiche un oscilloscope simulé de la tension entre deux nœuds
+    
+    Paramètres:
+    - from_node: nœud de référence pour la mesure
+    - to_node: nœud où la tension est mesurée
+    - time_span: durée totale de l'affichage (en secondes)
+    - num_points: nombre de points à calculer
+    - show_ref: afficher la référence de tension
+    - title: titre du graphique
+    """
     sources = [c for c in self.components if isinstance(c, VoltageSource)]
-
-    if not(self._solved) :
+    if not sources:
+        print("Erreur: Aucune source de tension dans le circuit")
+        return
+        
+    if not(self._solved):
         self.solve()
     
-    Vfn = from_node.voltage
-    Vtn = to_node.voltage
-
+    # Tensions aux nœuds
+    Vfn = from_node.voltage if from_node else 0
+    Vtn = to_node.voltage if to_node else 0
     V = Vtn - Vfn
     v_ref = sources[0].source_voltage
-
-    # On work
+    
+    # Aucune analyse temporelle nécessaire si le circuit est DC
+    if self.freq == 0:
+        plt.figure(figsize=(10, 6))
+        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.7)
+        plt.axhline(y=V.real if isinstance(V, complex) else V, color='blue', 
+                    linewidth=2, label=f'Tension mesurée: {V:.3f}V')
+        
+        if show_ref:
+            plt.axhline(y=v_ref, color='red', linewidth=1.5, 
+                       linestyle='--', label=f'Référence: {v_ref}V')
+        
+        plt.grid(True, alpha=0.3)
+        plt.title(title or f'Tension DC entre {from_node.name} et {to_node.name}')
+        plt.ylabel('Tension (V)')
+        plt.legend()
+        plt.show()
+        return
+    
+    # Pour AC, créer un graphique en fonction du temps
+    t = np.linspace(0, time_span, num_points)
+    omega = 2 * np.pi * self.freq
+    
+    # Calculer les tensions dans le domaine temporel
+    if isinstance(V, complex):
+        # Conversion du phaseur complexe en signal temporel
+        amplitude = abs(V)
+        phase = np.angle(V)
+        signal = amplitude * np.sin(omega * t + phase)
+    else:
+        # Si la tension est réelle (cas particulier)
+        signal = V * np.sin(omega * t)
+    
+    # Signal de référence (source)
+    if show_ref and isinstance(v_ref, complex):
+        ref_amplitude = abs(v_ref)
+        ref_phase = np.angle(v_ref)
+        ref_signal = ref_amplitude * np.sin(omega * t + ref_phase)
+    elif show_ref:
+        ref_signal = v_ref * np.sin(omega * t)
+    
+    # Créer le graphique
+    plt.figure(figsize=(12, 7))
+    plt.plot(t, signal, 'b-', linewidth=2, label=f'{from_node.name}-{to_node.name}: {abs(V):.3f}V ∠{np.degrees(np.angle(V) if isinstance(V, complex) else 0):.1f}°')
+    
+    if show_ref:
+        plt.plot(t, ref_signal, 'r--', linewidth=1.5, label=f'Référence: {abs(v_ref):.3f}V')
+    
+    # Ajouter des lignes pour les valeurs min, max et moyenne
+    plt.axhline(y=amplitude if isinstance(V, complex) else V, color='green', linestyle=':', alpha=0.7, label='Amplitude')
+    plt.axhline(y=-amplitude if isinstance(V, complex) else -V, color='green', linestyle=':', alpha=0.7)
+    plt.axhline(y=0, color='gray', linestyle='-', alpha=0.5)
+    
+    # Ajouter des périodes
+    period = 1.0 / self.freq
+    for i in range(int(time_span / period) + 1):
+        plt.axvline(x=i * period, color='gray', linestyle='--', alpha=0.3)
+    
+    # Configurer le graphique
+    plt.xlabel('Temps (s)')
+    plt.ylabel('Tension (V)')
+    plt.title(title or f'Tension entre {from_node.name} et {to_node.name} - {self.freq:.2f} Hz')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    
+    # Afficher des informations de mesure
+    textstr = '\n'.join((
+        f'Fréquence: {self.freq:.2f} Hz',
+        f'Période: {period*1000:.2f} ms',
+        f'Amplitude: {amplitude if isinstance(V, complex) else abs(V):.3f} V',
+        f'Phase: {np.degrees(np.angle(V) if isinstance(V, complex) else 0):.1f}°',
+        f'V RMS: {amplitude/np.sqrt(2) if isinstance(V, complex) else abs(V)/np.sqrt(2):.3f} V'
+    ))
+    
+    # Position du texte en haut à droite
+    props = dict(boxstyle='round', facecolor='white', alpha=0.7)
+    plt.annotate(textstr, xy=(0.97, 0.97), xycoords='axes fraction',
+                fontsize=9, ha='right', va='top', bbox=props)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    return {
+        'frequency': self.freq,
+        'amplitude': amplitude if isinstance(V, complex) else abs(V),
+        'phase': np.angle(V) if isinstance(V, complex) else 0,
+        'vrms': amplitude/np.sqrt(2) if isinstance(V, complex) else abs(V)/np.sqrt(2)
+    }
