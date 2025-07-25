@@ -2,12 +2,9 @@ from .components import *
 from .circuit import *
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from matplotlib.lines import Line2D
 from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Button, Slider
-from matplotlib.ticker import ScalarFormatter, AutoMinorLocator
-from concurrent.futures import ThreadPoolExecutor
 from matplotlib.patches import FancyArrowPatch
 from tqdm import tqdm
     
@@ -146,7 +143,7 @@ def voltage_phasors(self, duration=10, fps=60, theme='light'):
         t = elapsed_time[0]
         
         # Mettre à jour le texte de temps
-        time_text.set_text(f"t = {t:.3f} s")
+        time_text.set_text(f"t = {t:.3e} s")
         
         # Facteur de rotation (wt)
         omega = 2 * np.pi * self.freq
@@ -194,7 +191,7 @@ def voltage_phasors(self, duration=10, fps=60, theme='light'):
         elif percentage >= 10:
             speed_text.set_text(f"Vitesse: {percentage:.1f}%")
         else:
-            speed_text.set_text(f"Vitesse: {percentage:.2f}%")
+            speed_text.set_text(f"Vitesse: {percentage:.2e}%")
     
     # Fonction pour le bouton Reset
     def reset_animation(event):
@@ -506,7 +503,7 @@ def plot_bode(self,from_node,to_node,freq_range,show_phase=True):
 def plot_bode2(self, from_node=None, to_node=None, component=None, 
             freq_range=None, num_points=200, show_phase=True):
     """
-    Génère un diagramme de Bode simple pour analyser la réponse en fréquence.
+    Génère un diagramme de Bode simple pour analyser la réponse en fréquence, en automatique.
     
     Paramètres :
     -----------
@@ -711,7 +708,7 @@ def scope(self, from_node, to_node, time_span=0.1, num_points=1000, show_ref=Tru
     # Aucune analyse temporelle nécessaire si le circuit est DC
     if self.freq == 0:
         plt.figure(figsize=(10, 6))
-        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.7)
+        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
         plt.axhline(y=V.real if isinstance(V, complex) else V, color='blue', 
                     linewidth=2, label=f'Tension mesurée: {V:.3f}V')
         
