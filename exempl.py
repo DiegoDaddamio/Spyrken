@@ -21,9 +21,7 @@ R_mid.connect(n2, n3)
 
 
 # Ajoutez les composants au circuit
-circuit.add_component(V)
-circuit.add_component(R)
-circuit.add_component(R_mid)
+circuit.add_component((V,R,R_mid))
 
 # Résolvez
 circuit.solve()
