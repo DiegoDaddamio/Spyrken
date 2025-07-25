@@ -1,28 +1,30 @@
-from Spyrken import *
+from spyrken import *
 
+# Création du circuit et des noeuds (équipotentiels)
 circuit = Circuit()
 
-# Créez les nœuds d'abord
-n3 = circuit.add_node("n3",True)
+gnd = circuit.add_node("gnd",ground=True)
 n1 = circuit.add_node("n1")
 n2 = circuit.add_node("n2")
+v_source = circuit.add_node("V_source")
 
+# Configuration d'un circuit linéaire
+R1 = Resistor(1, "R1")
+C1 = Capacitor(1e-6, "C1")  
+L1 = Inductor(10e-3,"L1")
+V = VoltageSource(12, 1560,0 ,name="V") 
 
-# Créez vos composants
-V = VoltageSource(12, 30, 0, name="V_source")  # Ajoutez la fréquence (0 pour DC)
-R = Resistor(200, "R")
-R_mid = Resistor(400, "R_mid")
+#Rajout des composants dans le circuit
+circuit.add_component([V,R1,C1,L1])
 
+#Configuration des noeuds
+V.connect(v_source, gnd)
+R1.connect(v_source, n1)
+L1.connect(n1,n2)
+C1.connect(n2, gnd)
 
-# Connectez les composants aux nœuds
-V.connect(n1, n3)
-R.connect(n1, n2)
-R_mid.connect(n2, n3)
-
-
-# Ajoutez les composants au circuit
-circuit.add_component((V,R,R_mid))
-
-# Résolvez
+# Résolution
 circuit.solve()
-scope(circuit,n3,n2)
+
+# Affichage des résultats
+circuit.display()
