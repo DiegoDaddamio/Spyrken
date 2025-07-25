@@ -45,8 +45,11 @@ class Circuit:
         self.components = circuit
 
     def add_component(self,component):
-        self.components.append(component)
-
+        if isinstance(component,list):
+            for comp in component:
+                self.components.append(comp)
+        else:
+            self.components.append(component)
     
     def add_node(self, name=None, ground=False):
         """Ajoute un nœud au circuit"""
@@ -80,7 +83,6 @@ class Circuit:
                 components.insert(0,comp)
         self.components = components
     
-
 
     def solve(self):
         """Résout le circuit en utilisant la méthode des noeuds avec détection automatique de référence"""
