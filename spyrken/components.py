@@ -1,4 +1,5 @@
 import numpy as np
+from sympy import symbols
 
 class Component:
     """Classe de base pour les composants électriques"""
@@ -10,8 +11,10 @@ class Component:
         self.unit = None
         self.voltage = 0
         self.current = 0
+        self._firstorder = False
+        self.A_imp = None
         self.nodes = [None, None]  # Nœuds auxquels le composant est connecté
-    def calc_I(self, f=0):
+    def get_I(self, f=0):
         """Calcule le courant traversant le composant"""
         pass
     
@@ -95,7 +98,24 @@ class VoltageSource(Component):
         self.source_voltage = voltage
         self.r_int = internal_resistance
         self.freq = f
+        self._firstorder = True
+        
     def set_frequency(self, f):
         self.freq = f
+        
     def get_imp_cplx(self, f=0):
         return complex(self.value, 0)
+    
+    def calc_I(self, f=0):
+        """Calcule le courant à travers la source de tension"""
+        # Pour une source de tension idéale, le courant est déterminé 
+        # par le reste du circuit et non par la source elle-même
+        # Cependant, si une résistance interne est spécifiée, on peut calculer:
+        if self.r_int > 0:
+            self.current = self.voltage / self.r_int
+        else:
+            # Pour une source idéale, le courant est défini par le circuit
+            # Cette valeur sera mise à jour correctement après résolution complète
+            pass
+        
+        return self.current
