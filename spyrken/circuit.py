@@ -3,34 +3,17 @@ from .components import *
 
 class Node:
     """Représente un nœud dans le circuit"""
-    def __init__(self, name=None, ground=False):
+    def __init__(self, name=None):
         self.name = name if name else f"Node_{id(self)}"
         self.components = []  # Composants connectés à ce nœud
         self.voltage = 0      # Potentiel du nœud
         self.current = 0
-        self.isG = ground
-        self.priority = 0     # Priorité du nœud (plus élevée pour ground)
-        
-        # Si c'est un nœud de référence, sa priorité est maximale
-        if ground:
-            self.priority = 1000
     
     def connect(self, component):
-        """Connecte un composant à ce nœud"""
-        if component not in self.components:
-            self.components.append(component)
-            
-            # Si ce nœud est connecté à une source, augmenter sa priorité
-            if isinstance(component, VoltageSource):
-                self.priority += 100
-            
-    def is_connected(self):
-        """Vérifie si le nœud est connecté à au moins un composant"""
-        return len(self.components) > 0
-    
+        self.components.append(component)
+        
     def __str__(self):
-        status = "GND" if self.isG else f"V={self.voltage}V"
-        return f"{self.name}: {status}, {len(self.components)} élément(s) lié(s)"
+        return f"{self.name}: V={self.voltage}V, {len(self.components)} élément(s) lié(s)"
     
 
 class Circuit:
@@ -45,45 +28,21 @@ class Circuit:
         self.components = circuit
 
     def add_component(self,component):
-        self.components.append(component)
-
-    
-    def add_node(self, name=None, ground=False):
-        """Ajoute un nœud au circuit"""
-        node = Node(name, ground)
+        if isinstance(component,list):
+            for comp in component:
+                self.components.append(comp)
+        else :
+            self.components.append(component)
+    def add_node(self,name=None):
+        node = Node(name)
         self.nodes.append(node)
-        
-        # Si c'est un nœud de masse, le placer en premier dans la liste
-        if ground:
-            self.nodes.remove(node)
-            self.nodes.insert(0, node)
-        
         return node
-
-    def add_ground_node(self, name="GND"):
-        """Ajoute un nœud de masse au circuit"""
-        # Vérifier si un nœud de masse existe déjà
-        for node in self.nodes:
-            if node.isG:
-                return node
-        
-        return self.add_node(name, True)
     
     def set_frequency(self, f):
         self.freq = f
 
-    def comp_order(self):
-        components = self.components
-        for comp in components:
-            if comp._firstorder:
-                components.remove(comp)
-                components.insert(0,comp)
-        self.components = components
-    
-
-
     def solve(self):
-        """Résout le circuit en utilisant la méthode des noeuds avec détection automatique de référence"""
+        """Résout le circuit en utilisant la méthode des noeuds"""
         # Rechercher les sources de tension AC
         ac_sources = [comp for comp in self.components if isinstance(comp, VoltageSource) and comp.freq > 0]
         
@@ -91,71 +50,43 @@ class Circuit:
         if ac_sources:
             if len(set(src.freq for src in ac_sources)) > 1:
                 print("Attention: Plusieurs sources AC avec des fréquences différentes détectées.")
-                print("L'analyse supposera une fréquence de la première source AC.")
+                print("L'analyse supposera une fréquence dominante.")
             
             # Utiliser la fréquence de la première source AC
             self.freq = ac_sources[0].freq
-        else:
-            # Circuit DC par défaut
-            self.freq = 0
-        
         if len(self.nodes) < 2:
-            print("Erreur: Au moins deux nœuds sont nécessaires pour l'analyse.")
-            return False
-        
-        # Organiser les composants par priorité
-        self.comp_order()
-        
-        # Vérifier que tous les composants sont connectés
-        for component in self.components:
-            if None in component.nodes or len(component.nodes) < 2:
-                print(f"Erreur: Le composant {component.name} n'est pas correctement connecté.")
-                return False
-        
-        # Trouver le nœud de référence (GND)
-        reference_node = None
-        for node in self.nodes:
-            if node.isG:
-                reference_node = node
-                break
-        
-        # Si aucun nœud de masse n'est désigné, prendre le nœud avec la priorité la plus élevée
-        if reference_node is None:
-            nodes_sorted = sorted(self.nodes, key=lambda n: n.priority, reverse=True)
-            reference_node = nodes_sorted[0]
-            print(f"Aucun nœud de masse défini, utilisation de {reference_node.name} comme référence.")
-        
-        reference_node.voltage = 0  # Définir la tension de référence à 0
-        
-        # Identifier les autres nœuds dans l'ordre de priorité
-        other_nodes = [n for n in self.nodes if n != reference_node]
-        other_nodes.sort(key=lambda n: n.priority, reverse=True)
-        
-        # Construire la matrice d'admittance (Y) et le vecteur de courants (I)
-        n = len(other_nodes)
-        if n == 0:
-            print("Erreur: Aucun nœud à analyser après avoir défini la référence.")
+            print("Erreur: Au moins deux noeuds sont nécessaires.")
             return False
             
+        # 2. Prendre le premier noeud comme référence (masse)
+        reference_node = self.nodes[0]
+        reference_node.voltage = 0  
+        other_nodes = self.nodes[1:]
+        
+        # 3. Construire la matrice d'admittance (Y) et le vecteur de courants (I)
+        n = len(other_nodes)
         Y = np.zeros((n, n), dtype=complex)  # Matrice d'admittance
         I = np.zeros(n, dtype=complex)       # Vecteur de courants
         
-        # Pour chaque composant, ajouter sa contribution à la matrice Y
+        # 4. Pour chaque composant, ajouter sa contribution à la matrice Y
         for component in self.components:
             node1, node2 = component.nodes
             
+            # Ignorer les composants non connectés
+            if node1 is None or node2 is None:
+                print(f"Avertissement: Composant {component.name} non connecté.")
+                continue
+                
             # Calculer l'admittance Y = 1/Z à la fréquence actuelle
-            try:
-                Z = component.get_imp_cplx(self.freq)
-                if abs(Z) < 1e-12:
-                    Y_comp = 1e12  # Limite pour éviter division par zéro
-                else:
-                    Y_comp = 1 / Z
-            except Exception as e:
-                print(f"Erreur lors du calcul de l'impédance pour {component.name}: {e}")
-                return False
+            Z = component.get_imp_cplx(self.freq)
             
-            # Construction de la matrice selon les indices des nœuds
+            # Vérifier si Z est None
+            if Z is None:
+                print(f"Erreur: get_imp_cplx() a retourné None pour {component.name}")
+                return False
+                
+            Y_comp = 1 / Z if abs(Z) > 1e-12 else 1e12
+            # Ajouter la contribution aux éléments appropriés de la matrice Y
             if node1 != reference_node and node2 != reference_node:
                 i = other_nodes.index(node1)
                 j = other_nodes.index(node2)
@@ -169,52 +100,31 @@ class Circuit:
             elif node2 == reference_node and node1 != reference_node:
                 i = other_nodes.index(node1)
                 Y[i, i] += Y_comp
-        
-        # Pour chaque source de tension, modifier matrice Y et vecteur I
+                
+        # 5. Pour chaque source de tension, modifier Y et I
         for component in self.components:
             if isinstance(component, VoltageSource):
                 node1, node2 = component.nodes
                 V_source = component.source_voltage
+                Z_source = component.get_imp_cplx(self.freq)
+                Y_source = 1 / Z_source if abs(Z_source) > 1e-12 else 1e12
                 
-                # Obtenir l'admittance de la source
-                try:
-                    Z_source = component.get_imp_cplx(self.freq)
-                    Y_source = 1 / Z_source if abs(Z_source) > 1e-12 else 1e12
-                except Exception as e:
-                    print(f"Erreur lors du calcul de l'impédance de la source {component.name}: {e}")
-                    return False
-                
-                # Application correcte des sources au vecteur I
                 if node1 != reference_node and node2 == reference_node:
                     i = other_nodes.index(node1)
-                    I[i] += V_source * Y_source
+                    I[i] += V_source * Y_source  # Utiliser Y_source au lieu de Y_comp
                 elif node2 != reference_node and node1 == reference_node:
                     j = other_nodes.index(node2)
-                    I[j] -= V_source * Y_source
-                elif node1 != reference_node and node2 != reference_node:
-                    i = other_nodes.index(node1)
-                    j = other_nodes.index(node2)
-                    I[i] += V_source * Y_source
-                    I[j] -= V_source * Y_source
-        
-        # Résoudre le système Y⋅V = I
+                    I[j] -= V_source * Y_source  # Utiliser Y_source au lieu de Y_comp
+                    
+        # 6. Résoudre le système Y⋅V = I
         try:
-            # Vérifier si la matrice est singulière
-            det = np.linalg.det(Y)
-            if abs(det) < 1e-10:
-                print("Erreur: La matrice d'admittance est singulière (déterminant proche de zéro).")
-                print("Vérifiez qu'il n'y a pas de boucles de sources de tension ou de composants isolés.")
-                self._solved = False
-                return False
-            
             V = np.linalg.solve(Y, I)
             self._solved = True
-            
-            # Mettre à jour les tensions des nœuds
+            # 7. Mettre à jour les tensions des nœuds
             for i, node in enumerate(other_nodes):
                 node.voltage = V[i]
             
-            # Calculer les tensions et courants de chaque composant
+            # 8. Calculer les tensions et courants de chaque composant
             for component in self.components:
                 node1, node2 = component.nodes
                 if node1 and node2:
@@ -223,10 +133,9 @@ class Circuit:
             
             return True
         
-        except np.linalg.LinAlgError as e:
+        except np.linalg.LinAlgError:
             self._solved = False
-            print(f"Erreur: Impossible de résoudre le système: {e}")
-            print("Assurez-vous que le circuit est bien connecté et qu'il n'y a pas de boucles de sources de tension.")
+            print("Erreur: Impossible de résoudre le système. Vérifiez votre circuit.")
             return False
     
     def display(self):
@@ -239,5 +148,7 @@ class Circuit:
         print(f"  Noeuds: {len(self.nodes)}")
         for node in self.nodes:
             print(f"    {node}")
+
+        
     
     
