@@ -679,18 +679,12 @@ def plot_bode2(self, from_node=None, to_node=None, component=None,
         'phases': phases
     }
 
-def scope(self, from_node, to_node, time_span=0.1, num_points=1000, show_ref=True, title=None):
+def scope(self, from_node, to_node, interactive=True):
     """
-    Affiche un oscilloscope simulé de la tension entre deux nœuds
+    Affiche un oscilloscope simulé de la tension entre deux nœuds avec contrôles interactifs
+    """
+    from matplotlib.widgets import Slider, Button, RadioButtons, TextBox
     
-    Paramètres:
-    - from_node: nœud de référence pour la mesure
-    - to_node: nœud où la tension est mesurée
-    - time_span: durée totale de l'affichage (en secondes)
-    - num_points: nombre de points à calculer
-    - show_ref: afficher la référence de tension
-    - title: titre du graphique
-    """
     sources = [c for c in self.components if isinstance(c, VoltageSource)]
     if not sources:
         print("Erreur: Aucune source de tension dans le circuit")
@@ -699,96 +693,265 @@ def scope(self, from_node, to_node, time_span=0.1, num_points=1000, show_ref=Tru
     if not(self._solved):
         self.solve()
     
-    # Tensions aux nœuds
-    Vfn = from_node.voltage if from_node else 0
-    Vtn = to_node.voltage if to_node else 0
-    V = Vtn - Vfn
-    v_ref = sources[0].source_voltage
+    # Source principale à contrôler
+    main_source = sources[0]
     
-    # Aucune analyse temporelle nécessaire si le circuit est DC
-    if self.freq == 0:
-        plt.figure(figsize=(10, 6))
-        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
-        plt.axhline(y=V.real if isinstance(V, complex) else V, color='blue', 
-                    linewidth=2, label=f'Tension mesurée: {V:.3f}V')
+    # Créer une figure avec espaces pour les contrôles
+    fig, ax = plt.subplots(figsize=(12, 8))
+    plt.subplots_adjust(left=0.1, bottom=0.3, right=0.9, top=0.9)
+    
+    # Fonctions pour calculer et mettre à jour le signal
+    def calculate_signal(time_array):
+        # Résoudre le circuit avec les paramètres actuels
+        self.solve()
         
-        if show_ref:
-            plt.axhline(y=v_ref, color='red', linewidth=1.5, 
-                       linestyle='--', label=f'Référence: {v_ref}V')
+        # Tensions aux nœuds
+        Vfn = from_node.voltage if from_node else 0
+        Vtn = to_node.voltage if to_node else 0
+        V = Vtn - Vfn
         
-        plt.grid(True, alpha=0.3)
-        plt.title(title or f'Tension DC entre {from_node.name} et {to_node.name}')
-        plt.ylabel('Tension (V)')
-        plt.legend()
-        plt.show()
-        return
+        # Pour le circuit DC
+        if self.freq == 0:
+            return np.ones_like(time_array) * np.real(V)
+        
+        # Pour le circuit AC
+        omega = 2 * np.pi * self.freq
+        if isinstance(V, complex):
+            amplitude = abs(V)
+            phase = np.angle(V)
+            return amplitude * np.sin(omega * time_array + phase)
+        else:
+            return V * np.sin(omega * time_array)
     
-    # Pour AC, créer un graphique en fonction du temps
-    t = np.linspace(0, time_span, num_points)
-    omega = 2 * np.pi * self.freq
+    def calculate_ref_signal(time_array):
+        v_ref = main_source.source_voltage
+        
+        # Pour le circuit DC
+        if main_source.freq == 0:
+            return np.ones_like(time_array) * v_ref
+            
+        # Pour le circuit AC
+        omega = 2 * np.pi * main_source.freq
+        if isinstance(v_ref, complex):
+            ref_amplitude = abs(v_ref)
+            ref_phase = np.angle(v_ref)
+            return ref_amplitude * np.sin(omega * time_array + ref_phase)
+        else:
+            return v_ref * np.sin(omega * time_array)
     
-    # Calculer les tensions dans le domaine temporel
-    if isinstance(V, complex):
-        # Conversion du phaseur complexe en signal temporel
-        amplitude = abs(V)
-        phase = np.angle(V)
-        signal = amplitude * np.sin(omega * t + phase)
-    else:
-        # Si la tension est réelle (cas particulier)
-        signal = V * np.sin(omega * t)
+    # Créer les graphiques initiaux
+    t_max_init = 0.1 if main_source.freq == 0 else 3/max(main_source.freq, 1)
+    t = np.linspace(0, t_max_init, 1000)
     
-    # Signal de référence (source)
-    if show_ref and isinstance(v_ref, complex):
-        ref_amplitude = abs(v_ref)
-        ref_phase = np.angle(v_ref)
-        ref_signal = ref_amplitude * np.sin(omega * t + ref_phase)
-    elif show_ref:
-        ref_signal = v_ref * np.sin(omega * t)
+    signal_line, = ax.plot([], [], 'b-', linewidth=2, label=f'Tension {from_node.name}-{to_node.name}')
+    ref_line, = ax.plot([], [], 'r--', linewidth=1.5, label='Référence')
     
-    # Créer le graphique
-    plt.figure(figsize=(12, 7))
-    plt.plot(t, signal, 'b-', linewidth=2, label=f'{from_node.name}-{to_node.name}: {abs(V):.3f}V ∠{np.degrees(np.angle(V) if isinstance(V, complex) else 0):.1f}°')
+    # Configurer les axes
+    ax.set_xlabel('Temps (s)')
+    ax.set_ylabel('Tension (V)')
+    ax.grid(True, alpha=0.3)
+    ax.legend()
     
-    if show_ref:
-        plt.plot(t, ref_signal, 'r--', linewidth=1.5, label=f'Référence: {abs(v_ref):.3f}V')
+    # Informations de mesure
+    info_text = ax.text(0.02, 0.95, '', transform=ax.transAxes, 
+                       fontsize=9, va='top', ha='left',
+                       bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
     
-    # Ajouter des lignes pour les valeurs min, max et moyenne
-    plt.axhline(y=amplitude if isinstance(V, complex) else V, color='green', linestyle=':', alpha=0.7, label='Amplitude')
-    plt.axhline(y=-amplitude if isinstance(V, complex) else -V, color='green', linestyle=':', alpha=0.7)
-    plt.axhline(y=0, color='gray', linestyle='-', alpha=0.5)
+    # Ajouter les contrôles pour la source
+    # 1. Amplitude de la source
+    ampl_ax = plt.axes([0.1, 0.15, 0.3, 0.03])
+    ampl_slider = Slider(ampl_ax, 'Amplitude (V)', 0.1, 20, 
+                         valinit=main_source.source_voltage)
     
-    # Ajouter des périodes
-    period = 1.0 / self.freq
-    for i in range(int(time_span / period) + 1):
-        plt.axvline(x=i * period, color='gray', linestyle='--', alpha=0.3)
+    # 2. Fréquence (pour les sources AC)
+    freq_ax = plt.axes([0.1, 0.1, 0.3, 0.03])
+    freq_max = 1000 if main_source.freq > 0 else 100
+    freq_init = main_source.freq if main_source.freq > 0 else 50
+    freq_slider = Slider(freq_ax, 'Fréquence (Hz)', 0, freq_max, 
+                         valinit=freq_init)
     
-    # Configurer le graphique
-    plt.xlabel('Temps (s)')
-    plt.ylabel('Tension (V)')
-    plt.title(title or f'Tension entre {from_node.name} et {to_node.name} - {self.freq:.2f} Hz')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
+    # 3. Impédance interne
+    imp_ax = plt.axes([0.6, 0.15, 0.3, 0.03])
+    imp_slider = Slider(imp_ax, 'R interne (Ω)', 0, 1000, 
+                        valinit=main_source.r_int)
     
-    # Afficher des informations de mesure
-    textstr = '\n'.join((
-        f'Fréquence: {self.freq:.2f} Hz',
-        f'Période: {period*1000:.2f} ms',
-        f'Amplitude: {amplitude if isinstance(V, complex) else abs(V):.3f} V',
-        f'Phase: {np.degrees(np.angle(V) if isinstance(V, complex) else 0):.1f}°',
-        f'V RMS: {amplitude/np.sqrt(2) if isinstance(V, complex) else abs(V)/np.sqrt(2):.3f} V'
-    ))
+    # 4. Contrôle du temps d'affichage
+    time_ax = plt.axes([0.6, 0.1, 0.3, 0.03])
+    time_slider = Slider(time_ax, 'Durée (s)', 0.01, 1.0, 
+                         valinit=t_max_init)
     
-    # Position du texte en haut à droite
-    props = dict(boxstyle='round', facecolor='white', alpha=0.7)
-    plt.annotate(textstr, xy=(0.97, 0.97), xycoords='axes fraction',
-                fontsize=9, ha='right', va='top', bbox=props)
+    # 5. Boutons DC/AC
+    mode_ax = plt.axes([0.1, 0.03, 0.08, 0.04])
+    mode_button = Button(mode_ax, 'DC' if main_source.freq == 0 else 'AC')
     
-    plt.tight_layout()
+    # 6. Bouton de mise à jour
+    update_ax = plt.axes([0.25, 0.03, 0.1, 0.04])
+    update_button = Button(update_ax, 'Recalculer')
+    
+    # 7. Bouton pour afficher/masquer la référence
+    ref_ax = plt.axes([0.4, 0.03, 0.15, 0.04])
+    ref_button = Button(ref_ax, 'Masquer réf')
+    show_ref = [True]  # Utiliser une liste pour pouvoir modifier dans les fonctions
+    
+    # 8. Bouton de réinitialisation
+    reset_ax = plt.axes([0.6, 0.03, 0.1, 0.04])
+    reset_button = Button(reset_ax, 'Réinitialiser')
+    
+    # Fonction de mise à jour de l'affichage
+    def update_display():
+        # Mettre à jour le temps en fonction de la fréquence si nécessaire
+        t_max = time_slider.val
+        if self.freq > 0:
+            # Ajuster pour montrer au moins 2 périodes
+            period = 1.0 / self.freq
+            if t_max < 2 * period:
+                t_max = 2 * period
+                time_slider.set_val(t_max)
+        
+        t = np.linspace(0, t_max, 1000)
+        
+        # Calculer les signaux
+        signal = calculate_signal(t)
+        ref = calculate_ref_signal(t)
+        
+        # Mettre à jour les lignes
+        signal_line.set_data(t, signal)
+        ref_line.set_data(t, ref)
+        
+        # Ajuster les limites des axes
+        y_max = max(np.max(np.abs(signal)), np.max(np.abs(ref))) * 1.2
+        ax.set_xlim(0, t_max)
+        ax.set_ylim(-y_max, y_max)
+        
+        # Afficher/masquer la référence selon l'état
+        ref_line.set_visible(show_ref[0])
+        
+        # Mise à jour des informations
+        if self.freq > 0:
+            V = to_node.voltage - from_node.voltage
+            amplitude = abs(V)
+            phase = np.angle(V) if isinstance(V, complex) else 0
+            
+            info_str = '\n'.join((
+                f'Fréquence: {self.freq:.2f} Hz',
+                f'Période: {1/self.freq*1000:.2f} ms',
+                f'Amplitude: {amplitude:.3f} V',
+                f'Phase: {np.degrees(phase):.1f}°',
+                f'V RMS: {amplitude/np.sqrt(2):.3f} V'
+            ))
+        else:
+            V = to_node.voltage - from_node.voltage
+            V_real = np.real(V)
+            
+            info_str = f'Tension DC: {V_real:.3f} V'
+        
+        info_text.set_text(info_str)
+        
+        # Dessiner les périodes pour les signaux AC
+        if self.freq > 0:
+            # Supprimer les lignes verticales existantes
+            for line in ax.get_lines():
+                if line not in [signal_line, ref_line] and line.get_linestyle() == '--':
+                    line.remove()
+            
+            # Ajouter des lignes pour les périodes
+            period = 1.0 / self.freq
+            for i in range(1, int(t_max / period) + 1):
+                ax.axvline(x=i * period, color='gray', linestyle='--', alpha=0.3)
+        
+        # Titre du graphique
+        if self.freq > 0:
+            ax.set_title(f'Tension entre {from_node.name} et {to_node.name} - {self.freq:.2f} Hz')
+        else:
+            ax.set_title(f'Tension DC entre {from_node.name} et {to_node.name}')
+        
+        fig.canvas.draw_idle()
+    
+    # Fonctions de rappel pour les contrôles
+    def update_amplitude(val):
+        main_source.source_voltage = val
+        if interactive:
+            self.solve()
+            update_display()
+    
+    def update_frequency(val):
+        if val > 0:
+            main_source.freq = val
+            self.freq = val
+            mode_button.label.set_text('AC')
+        else:
+            main_source.freq = 0
+            self.freq = 0
+            mode_button.label.set_text('DC')
+        
+        if interactive:
+            self.solve()
+            update_display()
+    
+    def update_impedance(val):
+        main_source.r_int = val
+        main_source.value = val
+        if interactive:
+            self.solve()
+            update_display()
+    
+    def update_time(val):
+        update_display()
+    
+    def toggle_mode(event):
+        if mode_button.label.get_text() == 'DC':
+            mode_button.label.set_text('AC')
+            freq = freq_slider.val if freq_slider.val > 0 else 50
+            freq_slider.set_val(freq)
+            main_source.freq = freq
+            self.freq = freq
+        else:
+            mode_button.label.set_text('DC')
+            main_source.freq = 0
+            self.freq = 0
+            freq_slider.set_val(0)
+        
+        if interactive:
+            self.solve()
+            update_display()
+    
+    def toggle_ref(event):
+        show_ref[0] = not show_ref[0]
+        ref_button.label.set_text('Afficher réf' if not show_ref[0] else 'Masquer réf')
+        update_display()
+    
+    def force_update(event):
+        self.solve()
+        update_display()
+    
+    def reset(event):
+        ampl_slider.reset()
+        freq_slider.reset()
+        imp_slider.reset()
+        time_slider.reset()
+        main_source.freq = freq_init
+        main_source.source_voltage = main_source.source_voltage
+        main_source.r_int = main_source.r_int
+        mode_button.label.set_text('DC' if freq_init == 0 else 'AC')
+        show_ref[0] = True
+        ref_button.label.set_text('Masquer réf')
+        self.solve()
+        update_display()
+    
+    # Connecter les fonctions de rappel
+    ampl_slider.on_changed(update_amplitude)
+    freq_slider.on_changed(update_frequency)
+    imp_slider.on_changed(update_impedance)
+    time_slider.on_changed(update_time)
+    mode_button.on_clicked(toggle_mode)
+    ref_button.on_clicked(toggle_ref)
+    update_button.on_clicked(force_update)
+    reset_button.on_clicked(reset)
+    
+    # Initialiser l'affichage
+    self.solve()
+    update_display()
+    
     plt.show()
-    
-    return {
-        'frequency': self.freq,
-        'amplitude': amplitude if isinstance(V, complex) else abs(V),
-        'phase': np.angle(V) if isinstance(V, complex) else 0,
-        'vrms': amplitude/np.sqrt(2) if isinstance(V, complex) else abs(V)/np.sqrt(2)
-    }
+    return fig
+
