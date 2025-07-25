@@ -1,5 +1,4 @@
 import numpy as np
-from sympy import symbols
 
 class Component:
     """Classe de base pour les composants électriques"""
