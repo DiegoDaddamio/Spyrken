@@ -12,7 +12,7 @@ setup(
 
     author="DiegoDaddamio",
     author_email='diego.daddamio3110@gmail.com',
-    description="Simulateur de circuits électriques linéaire pour l'analyse et la visualisation de ceux-ci.",
+    description="Electronic Circuit Solver using Numerical Linear Algebra",
     url='https://github.com/DiegoDaddamio/Spyrken.git',
     classifiers=[
         'Programming Language :: Python :: 3',
