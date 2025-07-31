@@ -34,7 +34,7 @@ class Node:
     
 
 class Circuit:
-
+"""Représente la breadboard du circuit"""
     def __init__(self):
         self.components = []
         self.nodes = []
