@@ -14,4 +14,4 @@ __description__ = "Simulateur de circuits électriques linéaire pour l'analyse 
 # Facultatif : Ajouter des informations supplémentaires
 # __author__ = "DiegoDaddamio"
 # __email__ = "diego.daddamio3110@gmail.com"
-# __url__ = "https://github.com/DiegoDaddamio/Spyrken.git"
+# __url__ = "https://github.com/DiegoDaddamio/Spyrken"
