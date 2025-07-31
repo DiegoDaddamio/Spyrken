@@ -1,20 +1,19 @@
-# Spyrken : Projet de résolution de circuit électronique par l'algèbre linéaire numérique
+# Spyrken: Electronic Circuit Solver using Numerical Linear Algebra
 
-## Installation :
+## Installation:
 ```bash
 pip install git+https://github.com/DiegoDaddamio/Spyrken.git#egg=spyrken
 ```
-## Utilisation et visualisation :
-Le programme est fait pour résoudre des circuits simples à composants linéaires; résistance, condensateur et bobine.
+## Usage and Visualization:
+This program is designed to solve simple circuits composed of linear components: resistors, capacitors, and inductors.
 
-Il existe plusieurs fonctions pour visualiser/analyser le circuit donné :
-
+Several functions are available to visualize and analyze the given circuit:
 ```
-voltage_phasors(circuit) : Dessine les vecteurs tourants de Fresnel avec animation.
+voltage_phasors(circuit): Draws voltage phasors (rotating vectors) with animation.
 
-voltage_phasors2(circuit) : Dessine les vecteurs tourants de Fresnel avec animation mais avec plus de fluidité.
+voltage_phasors2(circuit): Draws voltage phasors with animation, offering smoother rendering.
 
-plot_bode(circuit,from_node,to_node,points_range) : Dessine, entre deux noeuds, le gain en sortie ainsi que la phase.
+plot_bode(circuit, from_node, to_node, points_range): Plots the output gain and phase response between two specified nodes (Bode plot).
 
-scope(circuit,from_node,to_node) : Dessine la tension, entre deux noeuds, sur oscilloscope.
+scope(circuit, from_node, to_node): Simulates an oscilloscope, displaying the voltage waveform between two specified nodes.
 ```
