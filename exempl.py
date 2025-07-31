@@ -1,5 +1,7 @@
 from spyrken import *
 
+# Faisons l'étude d'un circuit RLC
+
 # Création du circuit
 circuit = Circuit()
 
