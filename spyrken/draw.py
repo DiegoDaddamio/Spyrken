@@ -8,8 +8,6 @@ from matplotlib.widgets import Button, Slider
 from matplotlib.patches import FancyArrowPatch
 from tqdm import tqdm
     
-
-    
 def voltage_phasors(self, duration=10, fps=60, theme='light'):
     """
     Version haute performance de l'animation des vecteurs tournants.

@@ -41,8 +41,6 @@ class Circuit:
         self.freq = 0
         self._solved = False
 
-    def set_circuit(self,circuit):
-        self.components = circuit
 
     def add_component(self,component):
         if isinstance(component,list):
@@ -90,7 +88,7 @@ class Circuit:
         ac_sources = [comp for comp in self.components if isinstance(comp, VoltageSource) and comp.freq > 0]
         
         # Déterminer la fréquence d'analyse
-        if ac_sources:
+        if len(ac_sources) > 0:
             if len(set(src.freq for src in ac_sources)) > 1:
                 print("Attention: Plusieurs sources AC avec des fréquences différentes détectées.")
                 print("L'analyse supposera une fréquence de la première source AC.")

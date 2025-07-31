@@ -53,7 +53,7 @@ class Capacitor(Component):
     def __init__(self, C, name=None):
         super().__init__(C, name)
         self.phase = -1j
-    def calc_I(self,f=0):
+    def calc_I(self,f):
         if f != 0:
             self.current = self.voltage/self.cplx_imp
         else :
@@ -74,19 +74,15 @@ class Inductor(Component):
     def __init__(self, L, name=None):
         super().__init__(L, name)
         self.phase = 1j
-    def calc_I(self,f=0):
-        self.get_imp_cplx()
+    def calc_I(self,f):
+        self.get_imp_cplx(f)
         if f != 0:
             self.current = self.voltage/self.cplx_imp
         else :
-            self.current = np.inf
+            self.current = None
         return self.current
     
-    def get_imp_cplx(self, f=0):
-        if f == 0:
-            self.cplx_imp = complex(1e-12, 0)
-            return self.cplx_imp  # Retourner directement la valeur
-        else:
+    def get_imp_cplx(self, f):
             w = 2 * np.pi * f
             self.cplx_imp = complex(0, w * self.value)
             return self.cplx_imp  # Retourner directement la valeur
@@ -102,10 +98,10 @@ class VoltageSource(Component):
     def set_frequency(self, f):
         self.freq = f
         
-    def get_imp_cplx(self, f=0):
+    def get_imp_cplx(self,f):
         return complex(self.value, 0)
     
-    def calc_I(self, f=0):
+    def calc_I(self,f):
         """Calcule le courant à travers la source de tension"""
         # Pour une source de tension idéale, le courant est déterminé 
         # par le reste du circuit et non par la source elle-même

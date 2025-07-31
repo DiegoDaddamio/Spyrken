@@ -6,12 +6,12 @@ from .circuit import Circuit, Node
 from .draw import *
 
 # Définissez une version pour le package
-__version__ = "0.1.0"
+__version__ = "0.1.7"
 
 # Vous pouvez également ajouter une description du package
-__description__ = "Simulateur de circuits électriques pour l'analyse et la visualisation de circuits."
+__description__ = "Simulateur de circuits électriques linéaire pour l'analyse et la visualisation de ceux-ci."
 
 # Facultatif : Ajouter des informations supplémentaires
 # __author__ = "DiegoDaddamio"
 # __email__ = "diego.daddamio3110@gmail.com"
-# __url__ = ""
+# __url__ = "https://github.com/DiegoDaddamio/Spyrken.git"
