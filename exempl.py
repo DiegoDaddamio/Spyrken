@@ -21,7 +21,7 @@ V = VoltageSource(12, 1560,0 ,name="V")
 circuit.add_component([V,R1,C1,L1])
 
 # Configuration des connections entre noeuds (from,to)
-V.connect(v_source, gnd)
+V.connect(gnd, v_source)
 R1.connect(v_source, n1)
 L1.connect(n1,n2)
 C1.connect(n2, gnd)
